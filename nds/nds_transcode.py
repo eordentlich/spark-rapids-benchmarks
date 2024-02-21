@@ -54,7 +54,7 @@ TABLE_PARTITIONING = {
 
 
 def load(session, filename, schema, input_format, delimiter="|", header="false", prefix=""):
-    data_path = prefix + '/' + filename
+    data_path = prefix + '/' + filename + '_[1-9]*_*.dat'
     if input_format == 'csv':
         return session.read.option("delimiter", delimiter).option("header", header)\
             .option("encoding", "ISO-8859-1").csv(data_path, schema=schema)

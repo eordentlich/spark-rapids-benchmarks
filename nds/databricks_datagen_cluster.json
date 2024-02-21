@@ -1,0 +1,29 @@
+{
+"autoscale": {
+"min_workers": 2,
+"max_workers": 16
+},
+"cluster_name": "eo-general-purpose",
+"spark_version": "13.3.x-scala2.12",
+"spark_conf": {},
+"azure_attributes": {
+"first_on_demand": 1,
+"availability": "ON_DEMAND_AZURE",
+"spot_bid_max_price": -1
+},
+"node_type_id": "Standard_D8ads_v5",
+"driver_node_type_id": "Standard_D4ads_v5",
+"ssh_public_keys": [],
+"custom_tags": {},
+"spark_env_vars": {
+"PYSPARK_PYTHON": "/databricks/python3/bin/python3"
+},
+"autotermination_minutes": 60,
+"enable_elastic_disk": true,
+"init_scripts": [],
+"single_user_name": "eordentlich@nvidia.com",
+"enable_local_disk_encryption": false,
+"data_security_mode": "LEGACY_SINGLE_USER_STANDARD",
+"runtime_engine": "STANDARD",
+"cluster_id": "0126-064856-zlv8jbbc"
+}
