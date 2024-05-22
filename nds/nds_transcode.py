@@ -191,7 +191,13 @@ def transcode(args):
                                f"{fn}",
                                schema,
                                input_format=args.input_format,
-                               prefix=args.input_prefix),
+                               prefix=args.input_prefix) if args.sample == 1.0 else load(
+                                    session,
+                                    f"{fn}",
+                                    schema,
+                                    input_format=args.input_format,
+                                    prefix=args.input_prefix
+                               ).sample(args.sample),
                           f"{fn}",
                           args.output_format,
                           args.output_mode,
@@ -231,6 +237,12 @@ def transcode(args):
 
 if __name__ == "__main__":
     parser = parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--sample',
+        help='rate at which to subsample rows of table',
+        type=float,
+        default='1.0'
+    )
     parser.add_argument(
         'input_prefix',
         help='text to prepend to every input file path (e.g., "hdfs:///ds-generated-data"; the default is empty)')
