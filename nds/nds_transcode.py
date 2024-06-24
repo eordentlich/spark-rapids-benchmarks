@@ -129,9 +129,9 @@ def store(session,
     else:
         data_path = prefix + '/' + filename
         if filename in TABLE_PARTITIONING.keys():
-            # df = df.repartition(
-            #     col(TABLE_PARTITIONING[filename])).sortWithinPartitions(
-            #         TABLE_PARTITIONING[filename])
+            df = df.repartition(
+                col(TABLE_PARTITIONING[filename])).sortWithinPartitions(
+                    TABLE_PARTITIONING[filename])
             writer = df.write
             if compression:
                 writer = writer.option('compression', compression)
