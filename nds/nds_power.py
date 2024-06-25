@@ -254,9 +254,10 @@ def run_query_stream(input_prefix,
     # Run query
     power_start = int(time.time())
     for query_name, q_content in query_dict.items():
+        _query_name=query_name
         for i in range(repetitions):
             # show query name in Spark web UI
-            query_name=f"{query_name}#rep{i}"
+            query_name=f"{_query_name}#rep{i}"
             spark_session.sparkContext.setJobGroup(query_name, query_name)
             print("====== Run {} ======".format(query_name))
             q_report = PysparkBenchReport(spark_session, query_name)
