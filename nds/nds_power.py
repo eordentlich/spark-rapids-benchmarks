@@ -397,7 +397,8 @@ if __name__ == "__main__":
                         help='Do not exit with non zero when any query failed or any task failed')
     parser.add_argument('--repetitions',
                         type=int,
-                        help='repeat each query this many times')
+                        help='repeat each query this many times'
+                        default=1)
     args = parser.parse_args()
     query_dict = gen_sql_from_stream(args.query_stream_file)
     run_query_stream(args.input_prefix,
