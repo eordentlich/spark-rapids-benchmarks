@@ -185,6 +185,7 @@ def transcode(args):
     start_time = datetime.now()
     print(f"Load Test Start Time: {start_time}")
     for fn, schema in trans_tables.items():
+        session.sparkContext.setJobGroup(fn, fn)
         results[fn] = timeit.timeit(
             lambda: store(session,
                           load(session,
