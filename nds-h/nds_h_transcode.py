@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -72,7 +72,8 @@ def store(session,
           filename,
           output_format,
           output_mode,
-          prefix=""):
+          prefix="",
+          unmanaged_delta=False):
     """Create Iceberg tables by CTAS
 
     Args:
@@ -84,12 +85,19 @@ def store(session,
         iceberg_write_format (bool): write data into Iceberg tables with specified format
         compression (str): compression codec for converted data when saving to disk
         prefix (str): output data path when not using Iceberg.
+        unmanaged_delta (bool): write Delta data without persistent catalog metadata.
     """
     data_path = prefix + '/' + filename
     df = df.repartition(200)
     writer = df.write
     writer = writer.format(output_format).mode(output_mode)
-    writer.saveAsTable(filename, path=data_path)
+    if output_format == "delta":
+        if unmanaged_delta:
+            writer.save(data_path)
+        else:
+            writer.saveAsTable(filename)
+    else:
+        writer.saveAsTable(filename, path=data_path)
 
 def transcode(args):
     """
@@ -103,6 +111,9 @@ def transcode(args):
 
     """
     session_builder = pyspark.sql.SparkSession.builder
+    if args.output_format == "delta" and not args.unmanaged_delta:
+        session_builder.config("spark.sql.warehouse.dir", args.output_prefix)
+        session_builder.config("spark.sql.catalogImplementation", "hive")
     session = session_builder.appName(f"NDS-H - transcode - {args.output_format}").getOrCreate()
     session.sparkContext.setLogLevel(args.log_level)
     results = {}
@@ -131,7 +142,8 @@ def transcode(args):
                           f"{fn}",
                           args.output_format,
                           args.output_mode,
-                          args.output_prefix),
+                          args.output_prefix,
+                          args.unmanaged_delta),
             number=1)
 
     end_time = datetime.now()
@@ -199,5 +211,11 @@ if __name__ == "__main__":
         '--log_level',
         help='set log level for Spark driver log. Valid log levels include: ALL, DEBUG, ERROR, FATAL, INFO, OFF, TRACE, WARN(default: INFO)',
         default="INFO")
+    parser.add_argument(
+        '--unmanaged_delta', '--delta_unmanaged',
+        dest='unmanaged_delta',
+        action='store_true',
+        help='Use unmanaged tables for Delta Lake. This is useful for testing Delta Lake without ' +
+        'leveraging a Metastore service.')
     args = parser.parse_args()
     transcode(args)

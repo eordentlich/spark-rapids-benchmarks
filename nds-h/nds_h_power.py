@@ -287,7 +287,8 @@ def run_query_stream(input_prefix,
                      profiling_hook=None,
                      app_name=None,
                      spark_connect=None,
-                     analyze_tables=False):
+                     analyze_tables=False,
+                     unmanaged_delta=False):
     """run SQL in Spark and record execution time log. The execution time log is saved as a CSV file
     for easy accessibility. TempView Creation time is also recorded.
 
@@ -304,6 +305,7 @@ def run_query_stream(input_prefix,
         :param keep_sc : Databricks specific to keep the spark context alive. Defaults to False.
         :param json_summary_folder : path to save JSON summary files for each query.
         :param analyze_tables : whether to compute table statistics after creating tables.
+        :param unmanaged_delta : whether Delta tables are stored without persistent catalog metadata.
     """
     queries_reports = []
     execution_time_list = []
@@ -320,6 +322,9 @@ def run_query_stream(input_prefix,
         spark_properties = load_properties(property_file)
         for k, v in spark_properties.items():
             session_builder = session_builder.config(k, v)
+    if input_format == 'delta' and not unmanaged_delta:
+        session_builder.config("spark.sql.warehouse.dir", input_prefix)
+        session_builder.enableHiveSupport()
     spark_session = session_builder.appName(
         app_name).getOrCreate()
     spark_app_id = _get_app_id(spark_session)
@@ -327,7 +332,7 @@ def run_query_stream(input_prefix,
         execution_time_list = setup_tables(spark_session, input_prefix, input_format,
                                            execution_time_list,
                                            analyze_tables)
-    elif input_format == 'delta':
+    elif input_format == 'delta' and unmanaged_delta:
         execution_time_list = register_delta_tables(spark_session, input_prefix,
                                                      execution_time_list)
 
@@ -449,6 +454,11 @@ if __name__ == "__main__":
     parser.add_argument('--analyze_tables',
                         action='store_true',
                         help='Run ANALYZE TABLE <table> COMPUTE STATISTICS after creating each table.')
+    parser.add_argument('--unmanaged_delta', '--delta_unmanaged',
+                        dest='unmanaged_delta',
+                        action='store_true',
+                        help='Use unmanaged tables for Delta Lake. This is useful for testing Delta Lake without ' +
+                             'leveraging a Metastore service.')
     parser.add_argument('--output_prefix',
                         help='text to prepend to every output file (e.g., "hdfs:///ds-parquet")')
     parser.add_argument('--json_summary_folder',
@@ -514,4 +524,5 @@ if __name__ == "__main__":
                      args.profiling_hook,
                      args.app_name,
                      args.spark_connect,
-                     args.analyze_tables)
+                     args.analyze_tables,
+                     args.unmanaged_delta)
