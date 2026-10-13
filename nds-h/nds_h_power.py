@@ -167,21 +167,9 @@ def setup_tables(spark_session, input_prefix, input_format, execution_time_list,
     return execution_time_list
 
 
-def register_delta_tables(spark_session, input_prefix, execution_time_list):
-    spark_app_id = _get_app_id(spark_session)
-    # Register tables for Delta Lake
-    for table_name in get_schemas().keys():
-        start = int(time.time() * 1000)
-        # input_prefix must be absolute path: https://github.com/delta-io/delta/issues/555
-        register_sql = f"CREATE TABLE IF NOT EXISTS {table_name} USING DELTA LOCATION '{input_prefix}/{table_name}'"
-        print(register_sql)
-        spark_session.sql(register_sql)
-        end = int(time.time() * 1000)
-        print("====== Registering for table {} ======".format(table_name))
-        print("Time taken: {} millis for table {}".format(end - start, table_name))
-        execution_time_list.append(
-            (spark_app_id, "Register {}".format(table_name), end - start))
-    return execution_time_list
+def register_delta_temp_views(spark_session, input_prefix, execution_time_list):
+    """Register path-based Delta tables as session-scoped temporary views."""
+    return setup_tables(spark_session, input_prefix, 'delta', execution_time_list)
 
 
 def ensure_valid_column_names(df: DataFrame):
@@ -333,8 +321,8 @@ def run_query_stream(input_prefix,
                                            execution_time_list,
                                            analyze_tables)
     elif input_format == 'delta' and unmanaged_delta:
-        execution_time_list = register_delta_tables(spark_session, input_prefix,
-                                                     execution_time_list)
+        execution_time_list = register_delta_temp_views(spark_session, input_prefix,
+                                                        execution_time_list)
 
     check_json_summary_folder(json_summary_folder)
     if sub_queries:

@@ -291,7 +291,7 @@ def setup_tables(spark_session, input_prefix, input_format, use_decimal, executi
 
 def register_delta_tables(spark_session, input_prefix, execution_time_list):
     spark_app_id = _get_app_id(spark_session)
-    # Register tables for Delta Lake
+    # Register persistent catalog tables for Delta maintenance operations.
     for table_name in get_schemas(False).keys():
         start = int(time.time() * 1000)
         # input_prefix must be absolute path: https://github.com/delta-io/delta/issues/555
@@ -304,6 +304,11 @@ def register_delta_tables(spark_session, input_prefix, execution_time_list):
         execution_time_list.append(
             (spark_app_id, "Register {}".format(table_name), end - start))
     return execution_time_list
+
+
+def register_delta_temp_views(spark_session, input_prefix, execution_time_list):
+    """Register path-based Delta tables as session-scoped temporary views."""
+    return setup_tables(spark_session, input_prefix, 'delta', False, execution_time_list)
 
 
 def parse_explain_str(explain_str):
@@ -480,8 +485,9 @@ def run_query_stream(input_prefix,
         spark_session.catalog.setCurrentDatabase(input_prefix)
 
     if input_format == 'delta' and delta_unmanaged:
-        # Register tables for Delta Lake. This is only needed for unmanaged tables.
-        execution_time_list = register_delta_tables(spark_session, input_prefix, execution_time_list)
+        # Avoid persistent catalog entries for path-based Delta tables.
+        execution_time_list = register_delta_temp_views(spark_session, input_prefix,
+                                                        execution_time_list)
     spark_app_id = _get_app_id(spark_session)
     if input_format != 'iceberg' and input_format != 'delta' and not hive_external:
         execution_time_list = setup_tables(spark_session, input_prefix, input_format, use_decimal,
