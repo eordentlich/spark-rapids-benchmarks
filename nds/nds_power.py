@@ -37,6 +37,7 @@ import re
 import sys
 import time
 from collections import OrderedDict
+from uuid import uuid4
 from pyspark.sql import SparkSession
 from PysparkBenchReport import PysparkBenchReport
 from pyspark.sql import DataFrame
@@ -50,6 +51,18 @@ from spark_utils import setQueryName, clearQueryName
 from profiler import Profiler
 
 check_version()
+
+
+def _emit_eventlog_completion_marker(spark_session, marker):
+    """Record completion with a metadata-only SQL command on the driver."""
+    sc = spark_session.sparkContext
+    previous = sc.getLocalProperty("spark.job.description")
+    try:
+        sc.setJobDescription(marker)
+        spark_session.sql(f"DROP VIEW IF EXISTS `__ab_eventlog_unused_{uuid4().hex}`")
+    finally:
+        sc.setLocalProperty("spark.job.description", previous)
+    print(f"Event-log completion marker emitted: {marker}", flush=True)
 
 
 def _get_app_id(spark_session):
@@ -435,7 +448,8 @@ def run_query_stream(input_prefix,
                      skip_execution=False,
                      app_name=None,
                      spark_connect=None,
-                     analyze_tables=False):
+                     analyze_tables=False,
+                     eventlog_completion_marker=None):
     """run SQL in Spark and record execution time log. The execution time log is saved as a CSV file
     for easy accessibility. TempView Creation time is also recorded.
 
@@ -452,6 +466,8 @@ def run_query_stream(input_prefix,
         to "parquet".
         analyze_tables (bool, optional): whether to compute table statistics after creating tables.
     """
+    if eventlog_completion_marker and not keep_sc:
+        raise ValueError("--eventlog_completion_marker requires --keep_sc")
     queries_reports = []
     execution_time_list = []
     total_time_start = time.time()
@@ -614,6 +630,10 @@ def run_query_stream(input_prefix,
     if not allow_failure and exit_code:
         sys.exit(exit_code)
 
+    # All benchmark work and timing/report output precede this SQL boundary.
+    if eventlog_completion_marker:
+        _emit_eventlog_completion_marker(spark_session, eventlog_completion_marker)
+
 def load_properties(filename):
     myvars = {}
     with open(filename) as myfile:
@@ -671,6 +691,8 @@ if __name__ == "__main__":
                         help='Keep SparkContext alive after running all queries. This is a ' +
                         'limitation on Databricks runtime environment. User should always attach ' +
                         'this flag when running on Databricks.')
+    parser.add_argument('--eventlog_completion_marker',
+                        help='SQL description marking completion after all benchmark work; requires --keep_sc.')
     parser.add_argument('--hive',
                         action='store_true',
                         help='use table meta information in Hive metastore directly without ' +
@@ -753,4 +775,5 @@ if __name__ == "__main__":
                      args.skip_execution,
                      args.app_name,
                      args.spark_connect,
-                     args.analyze_tables)
+                     args.analyze_tables,
+                     args.eventlog_completion_marker)
