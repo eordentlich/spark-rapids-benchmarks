@@ -36,6 +36,7 @@ import pyspark
 import os
 
 from datetime import datetime
+from uuid import uuid4
 
 from pyspark.sql.types import *
 from pyspark.sql.functions import col
@@ -51,6 +52,18 @@ TABLE_PARTITIONING = {
     'web_sales': 'ws_sold_date_sk',
     'web_returns': 'wr_returned_date_sk'
 }
+
+
+def _emit_eventlog_completion_marker(spark_session, marker):
+    """Record completion with a metadata-only SQL command on the driver."""
+    sc = spark_session.sparkContext
+    previous = sc.getLocalProperty("spark.job.description")
+    try:
+        sc.setJobDescription(marker)
+        spark_session.sql(f"DROP VIEW IF EXISTS `__ab_eventlog_unused_{uuid4().hex}`")
+    finally:
+        sc.setLocalProperty("spark.job.description", previous)
+    print(f"Event-log completion marker emitted: {marker}", flush=True)
 
 
 def load(session, filename, schema, input_format, delimiter="|", header="false", prefix=""):
@@ -228,6 +241,10 @@ def transcode(args):
             report.write(str(conf) + "\n")
             print(conf)
 
+    # All data writes, timing measurements, and report output precede the marker.
+    if getattr(args, "eventlog_completion_marker", None):
+        _emit_eventlog_completion_marker(session, args.eventlog_completion_marker)
+
 
 if __name__ == "__main__":
     parser = parser = argparse.ArgumentParser()
@@ -244,6 +261,9 @@ if __name__ == "__main__":
     parser.add_argument(
         'report_file',
         help='location to store a performance report(local)')
+    parser.add_argument(
+        '--eventlog_completion_marker',
+        help='SQL description marking completion after conversion and report output.')
 
     parser.add_argument(
         '--output_mode',
